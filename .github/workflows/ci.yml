@@ -1,0 +1,58 @@
+name: Room Reservation CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend - Build and Test
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Run security and integration tests
+        working-directory: backend
+        run: |
+          bash ./mvnw --batch-mode "-Dtest=SecurityAuthorizationTests,ReservationAuthorizationTests,ReservationValidationTests,ApiExceptionHandlerTests,PostgreSqlIntegrationTests" test
+
+      - name: Build Spring Boot application
+        working-directory: backend
+        run: bash ./mvnw --batch-mode -DskipTests package
+
+  frontend:
+    name: Frontend - Build
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build React application
+        working-directory: frontend
+        run: npm run build

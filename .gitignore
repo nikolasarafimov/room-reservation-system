@@ -1,0 +1,48 @@
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+
+# VS Code
+.vscode/
+
+# Java and Maven
+**/target/
+*.class
+.mvn/timing.properties
+
+# Node.js and React
+**/node_modules/
+**/dist/
+**/coverage/
+.npm/
+npm-debug.log*
+
+# Logs
+*.log
+logs/
+
+# Operating system
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.bak
+*.backup
+
+# Local security setup artifacts
+security_step_5_3_patch/
+security_step_5_3_patch.zip
+setup-demo-passwords.ps1
+
+# Local backups
+room-reservation-before-security.zip
