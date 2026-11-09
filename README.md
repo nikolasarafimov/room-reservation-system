@@ -36,10 +36,9 @@ Analyze room utilization, reservation statuses, and equipment demand through Pos
 
 ![Room Reservation Reports](docs/screenshots/reports.png)
 
-- **Availability search** — filter rooms by date, time interval, capacity, type, and required equipment; exclude occupied rooms.
-
 ## Features
 
+- **Availability search** — filter rooms by date, time interval, capacity, type, and required equipment; exclude occupied rooms.
 - **Reservation requests** — request rooms and/or equipment, with validation and `pending` status.
 - **Approval workflow** — approve or reject requests through PostgreSQL-backed business logic.
 - **Role-based access** — separate `regular`, `approver`, and `admin` permissions, enforced on the server.
