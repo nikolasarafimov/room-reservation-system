@@ -8,8 +8,6 @@ A full-stack reservation management platform for shared rooms and equipment. Bui
 
 > **Project status:** Local-development / portfolio demonstration. The application uses seeded test data and is **not configured for public production deployment**.
 
-## Features
-
 ## Application Preview
 
 Explore the main features of the Room Reservation System through its interactive interface.
@@ -39,6 +37,9 @@ Analyze room utilization, reservation statuses, and equipment demand through Pos
 ![Room Reservation Reports](docs/screenshots/reports.png)
 
 - **Availability search** — filter rooms by date, time interval, capacity, type, and required equipment; exclude occupied rooms.
+
+## Features
+
 - **Reservation requests** — request rooms and/or equipment, with validation and `pending` status.
 - **Approval workflow** — approve or reject requests through PostgreSQL-backed business logic.
 - **Role-based access** — separate `regular`, `approver`, and `admin` permissions, enforced on the server.
