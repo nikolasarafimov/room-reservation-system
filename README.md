@@ -204,7 +204,13 @@ See [`database/`](database/) for the SQL definitions and seed data.
 
 ## Tests and CI
 
-GitHub Actions runs separate backend and frontend jobs on pushes and pull requests. The backend job executes **35 selected tests**, including Testcontainers-backed PostgreSQL integration tests; the frontend job runs `npm ci` and the Vite production build.
+GitHub Actions runs three independent CI jobs on every push and pull request:
+
+- **Backend — Build and Test:** Builds the Java 21 Spring Boot application and runs 35 selected security, authorization, validation, error-handling, and PostgreSQL integration tests using Testcontainers.
+- **Frontend — Build:** Installs dependencies with `npm ci` and verifies the React/Vite production build using Node.js 22.
+- **Prototype — Build Java 17:** Compiles and packages the original Java/JDBC prototype, verifying the executable JAR and its main class.
+
+All three components are continuously verified through the repository's automated CI pipeline. The prototype's interactive use cases have additionally been tested manually against its isolated PostgreSQL database.
 
 To run the selected tests locally (requires Java 21, Maven wrapper, and Docker for Testcontainers):
 

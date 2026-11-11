@@ -94,7 +94,7 @@ A fresh initialization contains **8 tables and 51 demo rows** in total.
 Compile from the repository root:
 
 ```powershell
-mvn -f .\prototype\pom.xml clean compile
+.\backend\mvnw.cmd -f .\prototype\pom.xml clean package
 ```
 
 You can also import `prototype/pom.xml` as a Maven project in IntelliJ IDEA and run the `mk.finki.roomreservation.App` main class.
@@ -125,7 +125,7 @@ When prompted, use:
 - No user login, authenticated identity, or server-side role authorization.
 - Uses sample users and data, not real institutional information.
 - Prototype SQL is intended for a disposable database and is not a migration system.
-- The root GitHub Actions workflow builds the final backend/frontend; it does **not** currently compile or test this prototype.
+- GitHub Actions automatically builds and packages the prototype, but interactive database use cases are verified manually rather than through automated integration tests.
 - Not intended for production deployment.
 
 ## Full-stack version
