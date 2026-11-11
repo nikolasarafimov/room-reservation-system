@@ -56,3 +56,27 @@ jobs:
       - name: Build React application
         working-directory: frontend
         run: npm run build
+
+  prototype:
+    name: Prototype - Build Java 17
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          cache-dependency-path: prototype/pom.xml
+
+      - name: Build Java JDBC prototype
+        run: bash ./backend/mvnw --batch-mode --no-transfer-progress -f ./prototype/pom.xml clean verify
+
+      - name: Verify executable JAR
+        run: |
+          test -s prototype/target/room-reservation-prototype.jar
+          unzip -p prototype/target/room-reservation-prototype.jar META-INF/MANIFEST.MF | grep -F 'Main-Class: mk.finki.roomreservation.App'
