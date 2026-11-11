@@ -48,6 +48,22 @@ Analyze room utilization, reservation statuses, and equipment demand through Pos
 - **Reproducible local stack** — Docker Compose runs the database, backend, and Nginx-served frontend.
 - **Automated checks** — unit, authorization, validation, API error-handling, and Testcontainers-backed PostgreSQL integration tests.
 
+## Original Java/JDBC Prototype
+
+The repository also includes the original command-line prototype, developed before the full-stack implementation.
+
+The prototype demonstrates three core use cases:
+
+- **UC0001 — Search Available Rooms:** Search for available rooms using date, time, capacity, room type, and equipment filters.
+- **UC0002 — Create Reservation Request:** Create pending reservations using JDBC transactions.
+- **UC0003 — Approve or Reject Reservation:** Process reservation decisions with transaction handling.
+
+**Technologies:** Java, JDBC, HikariCP, PostgreSQL, Maven.
+
+The prototype uses a separate `room_reservation_prototype` database and is preserved to demonstrate the project's development from a database-oriented console application to a full-stack platform.
+
+[Explore the Original Java/JDBC Prototype](prototype/README.md)
+
 ## Architecture
 
 ```text
@@ -213,6 +229,7 @@ CI workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 .github/workflows/ci.yml     CI pipeline
 backend/                     Spring Boot REST API and tests
 frontend/                    React UI and Nginx configuration
+prototype/                   Original Java/JDBC console prototype
 database/                    Schema, seed data, SQL logic and validation scripts
 scripts/                     Local demo-account password provisioning
 .env.example                 Safe configuration template
