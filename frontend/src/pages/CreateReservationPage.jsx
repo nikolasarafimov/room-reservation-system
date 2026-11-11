@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { ArrowRight, PlusCircle, RefreshCcw, Search, UserRound, Wrench } from "lucide-react";
+import { getDefaultReservationDate } from "../utils/date.js";
 import { createReservation, getEquipment, searchRooms } from "../api.js";
 
 export default function CreateReservationPage({ activeUser }) {
@@ -8,7 +9,7 @@ export default function CreateReservationPage({ activeUser }) {
     const [rooms, setRooms] = useState([]);
 
     const [form, setForm] = useState({
-        reservationDate: "2026-07-20",
+        reservationDate: getDefaultReservationDate(),
         startTime: "09:00",
         endTime: "10:00",
         minimumCapacity: 1,

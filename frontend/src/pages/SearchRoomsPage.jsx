@@ -2,11 +2,12 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 import { DoorOpen, Search, SlidersHorizontal } from "lucide-react";
+import { getDefaultReservationDate } from "../utils/date.js";
 import { searchRooms } from "../api.js";
 
 export default function SearchRoomsPage() {
     const [form, setForm] = useState({
-        reservationDate: "2026-07-20",
+        reservationDate: getDefaultReservationDate(),
         startTime: "09:00",
         endTime: "10:00",
         minimumCapacity: 1,
@@ -117,7 +118,7 @@ export default function SearchRoomsPage() {
                     <SectionTitle
                         icon={DoorOpen}
                         title="Available rooms"
-                        subtitle="Results are loaded from the live faculty PostgreSQL database."
+                        subtitle="Results are loaded from the PostgreSQL database."
                     />
 
                     {loading && <div className="empty-state">Searching database...</div>}

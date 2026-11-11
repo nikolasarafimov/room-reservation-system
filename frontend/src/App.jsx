@@ -515,7 +515,7 @@ function AppShell({ activeUser, activePage, setActivePage, onLogout, children })
               <Database size={18} />
               <div>
                 <strong>Database</strong>
-                <span>Local PostgreSQL</span>
+                <span>PostgreSQL</span>
               </div>
             </div>
 
