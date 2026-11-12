@@ -12,6 +12,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.http.SessionCreationPolicy;
 
 import java.nio.charset.StandardCharsets;
@@ -40,10 +41,29 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/health", "/api/auth/csrf").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/users").hasRole("ADMIN")
-                .requestMatchers("/api/approvers", "/api/approvals", "/api/reservations/pending")
+                    .requestMatchers("/api/approvers", "/api/approvals", "/api/reservations/pending")
                     .hasAnyRole("ADMIN", "APPROVER")
-                .requestMatchers("/api/**").authenticated()
-                .anyRequest().denyAll()
+                    .requestMatchers(HttpMethod.POST, "/api/reservations")
+                    .access((authentication, context) -> {
+                        var user = authentication.get();
+
+                        boolean allowedRole = user != null &&
+                                user.getAuthorities().stream().anyMatch(authority ->
+                                        authority.getAuthority().equals("ROLE_REGULAR") ||
+                                                authority.getAuthority().equals("ROLE_APPROVER") ||
+                                                authority.getAuthority().equals("ROLE_ADMIN")
+                                );
+
+                        boolean isDemoViewer = user != null &&
+                                "demo_viewer".equals(user.getName());
+
+                        return new AuthorizationDecision(
+                                allowedRole && !isDemoViewer
+                        );
+                    })
+                    .requestMatchers("/api/**").authenticated()
+
+                    .anyRequest().denyAll()
             )
             .formLogin(login -> login
                 .loginProcessingUrl("/api/auth/login")
