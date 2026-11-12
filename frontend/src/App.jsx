@@ -33,17 +33,48 @@ import {
   logout,
 } from "./api.js";
 
+function isDemoUser(user) {
+  return user?.username === "demo_viewer";
+}
+
+function canCreateReservation(user) {
+  return (
+      !isDemoUser(user) &&
+      ["regular", "approver", "admin"].includes(user?.role)
+  );
+}
+
+function canReviewApprovals(user) {
+  return (
+      !isDemoUser(user) &&
+      ["approver", "admin"].includes(user?.role)
+  );
+}
+
+function canAccessAdminPanel(user) {
+  return !isDemoUser(user) && user?.role === "admin";
+}
+
+function canAccessPage(user, page) {
+  switch (page) {
+    case "dashboard":
+    case "search":
+    case "reports":
+      return ["regular", "approver", "admin"].includes(user?.role);
+    case "create":
+      return canCreateReservation(user);
+    case "approvals":
+      return canReviewApprovals(user);
+    case "admin":
+      return canAccessAdminPanel(user);
+    default:
+      return false;
+  }
+}
+
 function App() {
   const [activeUser, setActiveUser] = useState(null);
   const [authChecking, setAuthChecking] = useState(true);
-
-  useEffect(() => {
-    localStorage.removeItem("activeUser");
-    getCurrentUser()
-        .then(setActiveUser)
-        .catch(() => setActiveUser(null))
-        .finally(() => setAuthChecking(false));
-  }, []);
 
   const [authView, setAuthView] = useState(() => {
     return localStorage.getItem("authView") || "landing";
@@ -53,9 +84,37 @@ function App() {
     return localStorage.getItem("activePage") || "dashboard";
   });
 
+  const currentPage =
+      activeUser && canAccessPage(activeUser, activePage)
+          ? activePage
+          : "dashboard";
+
+  useEffect(() => {
+    localStorage.removeItem("activeUser");
+
+    getCurrentUser()
+        .then(setActiveUser)
+        .catch(() => setActiveUser(null))
+        .finally(() => setAuthChecking(false));
+  }, []);
+
+  useEffect(() => {
+    if (activeUser) {
+      localStorage.setItem("activePage", currentPage);
+    }
+  }, [activeUser, currentPage]);
+
   function changeAuthView(view) {
     localStorage.setItem("authView", view);
     setAuthView(view);
+  }
+
+  function changePage(page) {
+    if (!activeUser || !canAccessPage(activeUser, page)) {
+      return;
+    }
+
+    setActivePage(page);
   }
 
   function handleLogin(user) {
@@ -75,27 +134,28 @@ function App() {
       toast.error(error.message);
       return;
     }
+
     localStorage.removeItem("activePage");
     localStorage.setItem("authView", "landing");
+
     setActiveUser(null);
     setAuthView("landing");
     setActivePage("dashboard");
   }
 
-  useEffect(() => {
-    if (activeUser) {
-      localStorage.setItem("activePage", activePage);
-    }
-  }, [activePage, activeUser]);
-
   if (authChecking) {
-    return <div className="auth-page">Checking your session...</div>;
+    return (
+        <div className="auth-page">
+          Checking your session...
+        </div>
+    );
   }
 
   if (!activeUser) {
     return (
         <>
           <Toaster position="top-right" />
+
           <AnimatePresence mode="wait">
             {authView === "landing" && (
                 <PageMotion key="landing">
@@ -132,48 +192,55 @@ function App() {
   return (
       <>
         <Toaster position="top-right" />
+
         <AppShell
             activeUser={activeUser}
-            activePage={activePage}
-            setActivePage={setActivePage}
+            activePage={currentPage}
+            setActivePage={changePage}
             onLogout={handleLogout}
         >
           <AnimatePresence mode="wait">
-            {activePage === "dashboard" && (
+            {currentPage === "dashboard" && (
                 <PageMotion key="dashboard">
-                  <Dashboard activeUser={activeUser} setActivePage={setActivePage} />
+                  <Dashboard
+                      activeUser={activeUser}
+                      setActivePage={changePage}
+                  />
                 </PageMotion>
             )}
 
-            {activePage === "search" && (
+            {currentPage === "search" && (
                 <PageMotion key="search">
                   <SearchRoomsPage />
                 </PageMotion>
             )}
 
-            {activePage === "create" && (
-                <PageMotion key="create">
-                  <CreateReservationPage activeUser={activeUser} />
-                </PageMotion>
-            )}
+            {currentPage === "create" &&
+                canCreateReservation(activeUser) && (
+                    <PageMotion key="create">
+                      <CreateReservationPage activeUser={activeUser} />
+                    </PageMotion>
+                )}
 
-            {activePage === "approvals" && (
-                <PageMotion key="approvals">
-                  <ApprovalsPage activeUser={activeUser} />
-                </PageMotion>
-            )}
+            {currentPage === "approvals" &&
+                canReviewApprovals(activeUser) && (
+                    <PageMotion key="approvals">
+                      <ApprovalsPage activeUser={activeUser} />
+                    </PageMotion>
+                )}
 
-            {activePage === "reports" && (
+            {currentPage === "reports" && (
                 <PageMotion key="reports">
                   <ReportsPage />
                 </PageMotion>
             )}
 
-            {activePage === "admin" && (
-                <PageMotion key="admin">
-                  <AdminPanelPage activeUser={activeUser} />
-                </PageMotion>
-            )}
+            {currentPage === "admin" &&
+                canAccessAdminPanel(activeUser) && (
+                    <PageMotion key="admin">
+                      <AdminPanelPage activeUser={activeUser} />
+                    </PageMotion>
+                )}
           </AnimatePresence>
         </AppShell>
       </>
@@ -193,10 +260,17 @@ function LandingScreen({ onLoginClick, onRegisterClick }) {
           </div>
 
           <div className="landing-header-actions">
-            <button className="ghost-button" onClick={onLoginClick}>
+            <button
+                className="ghost-button"
+                onClick={onLoginClick}
+            >
               Login
             </button>
-            <button className="landing-small-primary" onClick={onRegisterClick}>
+
+            <button
+                className="landing-small-primary"
+                onClick={onRegisterClick}
+            >
               Register
             </button>
           </div>
@@ -217,17 +291,24 @@ function LandingScreen({ onLoginClick, onRegisterClick }) {
             <h1>Smart Room Reservation System</h1>
 
             <p>
-              System for searching available rooms, creating reservation requests,
-              approving reservations, and analyzing resource usage.
+              System for searching available rooms, creating
+              reservation requests, approving reservations,
+              and analyzing resource usage.
             </p>
 
             <div className="landing-actions">
-              <button className="landing-primary" onClick={onLoginClick}>
+              <button
+                  className="landing-primary"
+                  onClick={onLoginClick}
+              >
                 Login to system
                 <ArrowRight size={20} />
               </button>
 
-              <button className="landing-secondary" onClick={onRegisterClick}>
+              <button
+                  className="landing-secondary"
+                  onClick={onRegisterClick}
+              >
                 Request access
                 <UserRound size={19} />
               </button>
@@ -264,11 +345,13 @@ function LandingScreen({ onLoginClick, onRegisterClick }) {
                 <strong>Rooms</strong>
                 <span>Availability search</span>
               </div>
+
               <div>
                 <ClipboardCheck size={22} />
                 <strong>Approvals</strong>
                 <span>Role-based decisions</span>
               </div>
+
               <div>
                 <BarChart3 size={22} />
                 <strong>Reports</strong>
@@ -281,10 +364,12 @@ function LandingScreen({ onLoginClick, onRegisterClick }) {
                 <CheckCircle2 size={18} />
                 Search available rooms
               </div>
+
               <div className="flow-item">
                 <CheckCircle2 size={18} />
                 Create pending reservation
               </div>
+
               <div className="flow-item">
                 <CheckCircle2 size={18} />
                 Approve through stored function
@@ -296,7 +381,11 @@ function LandingScreen({ onLoginClick, onRegisterClick }) {
   );
 }
 
-function LoginScreen({ onLogin, onBack, onRegisterClick }) {
+function LoginScreen({
+                       onLogin,
+                       onBack,
+                       onRegisterClick,
+                     }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -304,8 +393,10 @@ function LoginScreen({ onLogin, onBack, onRegisterClick }) {
   async function submit(event) {
     event.preventDefault();
     setLoading(true);
+
     try {
       const user = await login(username.trim(), password);
+
       setPassword("");
       onLogin(user);
     } catch (error) {
@@ -320,37 +411,105 @@ function LoginScreen({ onLogin, onBack, onRegisterClick }) {
         <div className="landing-orb orb-one" />
         <div className="landing-orb orb-two" />
         <div className="landing-orb orb-three" />
-        <motion.div className="auth-card"
-                    initial={{ opacity: 0, y: 28, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{ duration: 0.55, ease: "easeOut" }}>
-          <button className="auth-back-button" onClick={onBack}>← Back to home</button>
+
+        <motion.div
+            className="auth-card"
+            initial={{ opacity: 0, y: 28, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{
+              duration: 0.55,
+              ease: "easeOut",
+            }}
+        >
+          <button
+              className="auth-back-button"
+              onClick={onBack}
+          >
+            ← Back to home
+          </button>
+
           <div className="auth-left-panel">
-            <div className="auth-logo"><img src="/logo.png" alt="Room Reservation logo" /></div>
+            <div className="auth-logo">
+              <img
+                  src="/logo.png"
+                  alt="Room Reservation logo"
+              />
+            </div>
+
             <div className="auth-left-copy">
-              <div className="landing-eyebrow"><ShieldCheck size={16} /> Secure access</div>
+              <div className="landing-eyebrow">
+                <ShieldCheck size={16} />
+                Secure access
+              </div>
+
               <h2>Access the reservation workspace.</h2>
-              <p>Sign in with your assigned account to manage rooms, reservations and approvals.</p>
+
+              <p>
+                Sign in with your assigned account to manage
+                rooms, reservations and approvals.
+              </p>
             </div>
           </div>
+
           <div className="auth-right-panel">
             <div className="auth-form-header">
-              <div className="auth-icon-badge"><UserRound size={24} /></div>
-              <div><h1>Sign In</h1><p>Enter your account credentials.</p></div>
+              <div className="auth-icon-badge">
+                <UserRound size={24} />
+              </div>
+
+              <div>
+                <h1>Sign In</h1>
+                <p>Enter your account credentials.</p>
+              </div>
             </div>
-            <form className="login-form polished" onSubmit={submit}>
-              <label>Username
-                <input type="text" autoComplete="username" required value={username}
-                       onChange={(event) => setUsername(event.target.value)} />
+
+            <form
+                className="login-form polished"
+                onSubmit={submit}
+            >
+              <label>
+                Username
+                <input
+                    type="text"
+                    autoComplete="username"
+                    required
+                    value={username}
+                    onChange={(event) =>
+                        setUsername(event.target.value)
+                    }
+                />
               </label>
-              <label>Password
-                <input type="password" autoComplete="current-password" required value={password}
-                       onChange={(event) => setPassword(event.target.value)} />
+
+              <label>
+                Password
+                <input
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={(event) =>
+                        setPassword(event.target.value)
+                    }
+                />
               </label>
-              <button className="primary full auth-submit" disabled={loading || !username.trim() || !password}>
-                {loading ? "Signing in..." : "Sign in"}<ArrowRight size={18} />
+
+              <button
+                  className="primary full auth-submit"
+                  disabled={
+                      loading ||
+                      !username.trim() ||
+                      !password
+                  }
+              >
+                {loading ? "Signing in..." : "Sign in"}
+                <ArrowRight size={18} />
               </button>
-              <button className="auth-link-button" type="button" onClick={onRegisterClick}>
+
+              <button
+                  className="auth-link-button"
+                  type="button"
+                  onClick={onRegisterClick}
+              >
                 Request access
               </button>
             </form>
@@ -360,7 +519,10 @@ function LoginScreen({ onLogin, onBack, onRegisterClick }) {
   );
 }
 
-function RegisterScreen({ onBack, onLoginClick }) {
+function RegisterScreen({
+                          onBack,
+                          onLoginClick,
+                        }) {
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -369,18 +531,28 @@ function RegisterScreen({ onBack, onLoginClick }) {
   });
 
   function updateField(field, value) {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    setForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
   }
 
-  function submit(e) {
-    e.preventDefault();
+  function submit(event) {
+    event.preventDefault();
 
-    if (!form.fullName.trim() || !form.email.trim() || !form.username.trim()) {
+    if (
+        !form.fullName.trim() ||
+        !form.email.trim() ||
+        !form.username.trim()
+    ) {
       toast.error("Please fill in all required fields.");
       return;
     }
 
-    toast.success("Registration request submitted as demo.");
+    toast.success(
+        "Registration request submitted as demo."
+    );
+
     onLoginClick();
   }
 
@@ -395,12 +567,18 @@ function RegisterScreen({ onBack, onLoginClick }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.5 }}
         >
-          <button className="auth-back-button" onClick={onBack}>
+          <button
+              className="auth-back-button"
+              onClick={onBack}
+          >
             ← Back to home
           </button>
 
           <div className="register-left">
-            <img src="/logo.png" alt="Room Reservation logo" />
+            <img
+                src="/logo.png"
+                alt="Room Reservation logo"
+            />
 
             <div>
               <div className="landing-eyebrow">
@@ -409,20 +587,30 @@ function RegisterScreen({ onBack, onLoginClick }) {
               </div>
 
               <h1>Request system access</h1>
+
               <p>
-                This screen is a production-style UI demo. Real project access is
-                based on predefined database users and roles in the PostgreSQL
+                This screen is a production-style UI demo.
+                Real project access is based on predefined
+                database users and roles in the PostgreSQL
                 schema.
               </p>
             </div>
           </div>
 
-          <form className="register-form" onSubmit={submit}>
+          <form
+              className="register-form"
+              onSubmit={submit}
+          >
             <label>
               Full name
               <input
                   value={form.fullName}
-                  onChange={(e) => updateField("fullName", e.target.value)}
+                  onChange={(event) =>
+                      updateField(
+                          "fullName",
+                          event.target.value
+                      )
+                  }
                   placeholder="Example: Nikola Sarafimov"
               />
             </label>
@@ -432,7 +620,12 @@ function RegisterScreen({ onBack, onLoginClick }) {
               <input
                   type="email"
                   value={form.email}
-                  onChange={(e) => updateField("email", e.target.value)}
+                  onChange={(event) =>
+                      updateField(
+                          "email",
+                          event.target.value
+                      )
+                  }
                   placeholder="example@finki.ukim.mk"
               />
             </label>
@@ -441,25 +634,50 @@ function RegisterScreen({ onBack, onLoginClick }) {
               Username
               <input
                   value={form.username}
-                  onChange={(e) => updateField("username", e.target.value)}
+                  onChange={(event) =>
+                      updateField(
+                          "username",
+                          event.target.value
+                      )
+                  }
                   placeholder="example_user"
               />
             </label>
 
             <label>
               Requested role
-              <select value={form.role} onChange={(e) => updateField("role", e.target.value)}>
-                <option value="regular">regular</option>
-                <option value="approver">approver</option>
+              <select
+                  value={form.role}
+                  onChange={(event) =>
+                      updateField(
+                          "role",
+                          event.target.value
+                      )
+                  }
+              >
+                <option value="regular">
+                  regular
+                </option>
+
+                <option value="approver">
+                  approver
+                </option>
               </select>
             </label>
 
-            <button className="landing-primary full" type="submit">
+            <button
+                className="landing-primary full"
+                type="submit"
+            >
               Submit access request
               <ArrowRight size={19} />
             </button>
 
-            <button className="auth-link-button" type="button" onClick={onLoginClick}>
+            <button
+                className="auth-link-button"
+                type="button"
+                onClick={onLoginClick}
+            >
               Already have access? Login
             </button>
           </form>
@@ -468,28 +686,75 @@ function RegisterScreen({ onBack, onLoginClick }) {
   );
 }
 
-function AppShell({ activeUser, activePage, setActivePage, onLogout, children }) {
+function AppShell({
+                    activeUser,
+                    activePage,
+                    setActivePage,
+                    onLogout,
+                    children,
+                  }) {
   const items = useMemo(() => {
     const base = [
-      { key: "dashboard", label: "Dashboard", icon: Activity, roles: ["regular", "approver", "admin"] },
-      { key: "search", label: "Search Rooms", icon: Search, roles: ["regular", "approver", "admin"] },
-      { key: "create", label: "Create Reservation", icon: PlusCircle, roles: ["regular", "approver", "admin"] },
-      { key: "approvals", label: "Approvals", icon: ClipboardCheck, roles: ["approver", "admin"] },
-      { key: "reports", label: "Reports", icon: BarChart3, roles: ["regular", "approver", "admin"] },
-      { key: "admin", label: "Admin Panel", icon: ShieldCheck, roles: ["admin"] },
+      {
+        key: "dashboard",
+        label: "Dashboard",
+        icon: Activity,
+        roles: ["regular", "approver", "admin"],
+      },
+      {
+        key: "search",
+        label: "Search Rooms",
+        icon: Search,
+        roles: ["regular", "approver", "admin"],
+      },
+      {
+        key: "create",
+        label: "Create Reservation",
+        icon: PlusCircle,
+        roles: ["regular", "approver", "admin"],
+      },
+      {
+        key: "approvals",
+        label: "Approvals",
+        icon: ClipboardCheck,
+        roles: ["approver", "admin"],
+      },
+      {
+        key: "reports",
+        label: "Reports",
+        icon: BarChart3,
+        roles: ["regular", "approver", "admin"],
+      },
+      {
+        key: "admin",
+        label: "Admin Panel",
+        icon: ShieldCheck,
+        roles: ["admin"],
+      },
     ];
 
-    return base.filter((item) => item.roles.includes(activeUser.role));
-  }, [activeUser.role]);
+    return base.filter(
+        (item) =>
+            item.roles.includes(activeUser.role) &&
+            canAccessPage(activeUser, item.key)
+    );
+  }, [activeUser.role, activeUser.username]);
 
-  const activeItem = items.find((item) => item.key === activePage);
+  const activeItem = items.find(
+      (item) => item.key === activePage
+  );
+
+  const demoViewer = isDemoUser(activeUser);
 
   return (
       <div className="app-shell">
         <aside className="sidebar">
           <div className="brand brand-only-logo">
             <div className="brand-logo">
-              <img src="/logo.png" alt="Room Reservation logo" />
+              <img
+                  src="/logo.png"
+                  alt="Room Reservation logo"
+              />
             </div>
           </div>
 
@@ -500,8 +765,14 @@ function AppShell({ activeUser, activePage, setActivePage, onLogout, children })
               return (
                   <button
                       key={item.key}
-                      className={activePage === item.key ? "active" : ""}
-                      onClick={() => setActivePage(item.key)}
+                      className={
+                        activePage === item.key
+                            ? "active"
+                            : ""
+                      }
+                      onClick={() =>
+                          setActivePage(item.key)
+                      }
                   >
                     <Icon size={19} />
                     <span>{item.label}</span>
@@ -513,6 +784,7 @@ function AppShell({ activeUser, activePage, setActivePage, onLogout, children })
           <div className="sidebar-footer">
             <div className="connection-card">
               <Database size={18} />
+
               <div>
                 <strong>Database</strong>
                 <span>PostgreSQL</span>
@@ -520,14 +792,27 @@ function AppShell({ activeUser, activePage, setActivePage, onLogout, children })
             </div>
 
             <div className="user-card">
-              <div className="avatar small">{getInitials(activeUser.fullName)}</div>
-
-              <div>
-                <strong>{activeUser.fullName}</strong>
-                <span>{activeUser.role}</span>
+              <div className="avatar small">
+                {getInitials(activeUser.fullName)}
               </div>
 
-              <button className="icon-button" onClick={onLogout} title="Logout">
+              <div>
+                <strong>
+                  {activeUser.fullName}
+                </strong>
+
+                <span>
+                {demoViewer
+                    ? "Demo Visitor"
+                    : activeUser.role}
+              </span>
+              </div>
+
+              <button
+                  className="icon-button"
+                  onClick={onLogout}
+                  title="Logout"
+              >
                 <LogOut size={17} />
               </button>
             </div>
@@ -537,21 +822,37 @@ function AppShell({ activeUser, activePage, setActivePage, onLogout, children })
         <main className="main-area">
           <header className="topbar">
             <div>
-              <span className="topbar-label">Current module</span>
-              <h2>{activeItem?.label || "Room Reservation"}</h2>
+            <span className="topbar-label">
+              Current module
+            </span>
+
+              <h2>
+                {activeItem?.label ||
+                    "Room Reservation"}
+              </h2>
             </div>
 
             <div className="topbar-actions">
               <div className="status-pill">
                 <span className="status-dot" />
-                Live database
+                {demoViewer
+                    ? "Read-only demo"
+                    : "Live database"}
               </div>
 
               <div className="top-user">
                 <UserRound size={18} />
+
                 <div>
-                  <strong>{activeUser.fullName}</strong>
-                  <span>{activeUser.role}</span>
+                  <strong>
+                    {activeUser.fullName}
+                  </strong>
+
+                  <span>
+                  {demoViewer
+                      ? "Demo Visitor"
+                      : activeUser.role}
+                </span>
                 </div>
               </div>
             </div>
@@ -563,37 +864,85 @@ function AppShell({ activeUser, activePage, setActivePage, onLogout, children })
   );
 }
 
-function Dashboard({ activeUser, setActivePage }) {
+function Dashboard({
+                     activeUser,
+                     setActivePage,
+                   }) {
   const [stats, setStats] = useState(null);
   const [health, setHealth] = useState(null);
+
+  const demoViewer = isDemoUser(activeUser);
+  const allowCreation = canCreateReservation(activeUser);
+  const allowApprovals = canReviewApprovals(activeUser);
 
   useEffect(() => {
     getDashboardStats()
         .then(setStats)
-        .catch((err) => toast.error(err.message));
+        .catch((error) =>
+            toast.error(error.message)
+        );
 
     getHealth()
         .then(setHealth)
-        .catch((err) => toast.error(err.message));
+        .catch((error) =>
+            toast.error(error.message)
+        );
   }, []);
 
   return (
       <section>
         <Hero
-            eyebrow="System overview"
+            eyebrow={
+              demoViewer
+                  ? "Read-only demonstration"
+                  : "System overview"
+            }
             title={`Welcome back, ${activeUser.fullName}`}
-            subtitle="Control center for reservations, approvals, database reports and live project data."
+            subtitle={
+              demoViewer
+                  ? "Explore the dashboard, room availability and reports. Reservation creation and approval actions are disabled for demo visitors."
+                  : "Control center for reservations, approvals, database reports and live project data."
+            }
         />
 
         {!stats && <SkeletonGrid />}
 
         {stats && (
             <div className="stats-grid">
-              <StatCard icon={DoorOpen} label="Rooms" value={stats.totalRooms} accent="blue" />
-              <StatCard icon={Boxes} label="Equipment Types" value={stats.totalEquipmentTypes} accent="violet" />
-              <StatCard icon={Users} label="Users" value={stats.totalUsers} accent="cyan" />
-              <StatCard icon={CalendarCheck} label="Pending Reservations" value={stats.pendingReservations} accent="amber" />
-              <StatCard icon={CheckCircle2} label="Approved Reservations" value={stats.approvedReservations} accent="green" />
+              <StatCard
+                  icon={DoorOpen}
+                  label="Rooms"
+                  value={stats.totalRooms}
+                  accent="blue"
+              />
+
+              <StatCard
+                  icon={Boxes}
+                  label="Equipment Types"
+                  value={stats.totalEquipmentTypes}
+                  accent="violet"
+              />
+
+              <StatCard
+                  icon={Users}
+                  label="Users"
+                  value={stats.totalUsers}
+                  accent="cyan"
+              />
+
+              <StatCard
+                  icon={CalendarCheck}
+                  label="Pending Reservations"
+                  value={stats.pendingReservations}
+                  accent="amber"
+              />
+
+              <StatCard
+                  icon={CheckCircle2}
+                  label="Approved Reservations"
+                  value={stats.approvedReservations}
+                  accent="green"
+              />
             </div>
         )}
 
@@ -602,7 +951,12 @@ function Dashboard({ activeUser, setActivePage }) {
             <div className="panel-header">
               <div>
                 <h3>Quick actions</h3>
-                <p>Common workflows used during the project demonstration.</p>
+
+                <p>
+                  {demoViewer
+                      ? "Explore the available read-only features of the application."
+                      : "Common workflows used during the project demonstration."}
+                </p>
               </div>
             </div>
 
@@ -611,22 +965,30 @@ function Dashboard({ activeUser, setActivePage }) {
                   icon={Search}
                   title="Search available rooms"
                   description="Check capacity, type, equipment and time overlap."
-                  onClick={() => setActivePage("search")}
+                  onClick={() =>
+                      setActivePage("search")
+                  }
               />
 
-              <ActionCard
-                  icon={PlusCircle}
-                  title="Create reservation"
-                  description="Create a pending request using a transaction."
-                  onClick={() => setActivePage("create")}
-              />
+              {allowCreation && (
+                  <ActionCard
+                      icon={PlusCircle}
+                      title="Create reservation"
+                      description="Create a pending request using a transaction."
+                      onClick={() =>
+                          setActivePage("create")
+                      }
+                  />
+              )}
 
-              {(activeUser.role === "approver" || activeUser.role === "admin") && (
+              {allowApprovals && (
                   <ActionCard
                       icon={ClipboardCheck}
                       title="Review approvals"
                       description="Approve or reject pending reservations."
-                      onClick={() => setActivePage("approvals")}
+                      onClick={() =>
+                          setActivePage("approvals")
+                      }
                   />
               )}
 
@@ -634,7 +996,9 @@ function Dashboard({ activeUser, setActivePage }) {
                   icon={BarChart3}
                   title="Open reports"
                   description="View advanced SQL analytical reports."
-                  onClick={() => setActivePage("reports")}
+                  onClick={() =>
+                      setActivePage("reports")
+                  }
               />
             </div>
           </div>
@@ -643,49 +1007,58 @@ function Dashboard({ activeUser, setActivePage }) {
             <div className="panel-header">
               <div>
                 <h3>Database status</h3>
-                <p>Live connection check from backend.</p>
+
+                <p>
+                  Live connection check from backend.
+                </p>
               </div>
             </div>
 
             <div className="role-card">
               <Database size={34} />
+
               <div>
                 <span>Status</span>
-                <strong>{health ? `${health.status} · ${health.database}` : "Loading..."}</strong>
-                {health && <small>Schema: {health.schema} · Rooms: {health.roomCount}</small>}
+
+                <strong>
+                  {health
+                      ? `${health.status} · ${health.database}`
+                      : "Loading..."}
+                </strong>
+
+                {health && (
+                    <small>
+                      Schema: {health.schema} · Rooms:{" "}
+                      {health.roomCount}
+                    </small>
+                )}
               </div>
             </div>
 
             <div className="role-card second">
               <ShieldCheck size={34} />
+
               <div>
-                <span>Active role</span>
-                <strong>{activeUser.role}</strong>
-                <small>Navigation is filtered by role.</small>
+              <span>
+                {demoViewer
+                    ? "Access mode"
+                    : "Active role"}
+              </span>
+
+                <strong>
+                  {demoViewer
+                      ? "Read-only Demo Visitor"
+                      : activeUser.role}
+                </strong>
+
+                <small>
+                  {demoViewer
+                      ? "Viewing and searching are allowed. Reservation creation and approvals are disabled."
+                      : "Navigation is filtered by role."}
+                </small>
               </div>
             </div>
           </div>
-        </div>
-      </section>
-  );
-}
-
-function PlaceholderPage({ icon: Icon, title, subtitle }) {
-  return (
-      <section>
-        <Hero
-            eyebrow="Next implementation phase"
-            title={title}
-            subtitle={subtitle}
-        />
-
-        <div className="panel placeholder-panel">
-          <Icon size={42} />
-          <h3>{title}</h3>
-          <p>
-            The UI shell is ready. This module will be connected to the backend
-            endpoints in the next phase.
-          </p>
         </div>
       </section>
   );
@@ -694,17 +1067,36 @@ function PlaceholderPage({ icon: Icon, title, subtitle }) {
 function PageMotion({ children }) {
   return (
       <motion.div
-          initial={{ opacity: 0, y: 18, filter: "blur(6px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          exit={{ opacity: 0, y: -12, filter: "blur(4px)" }}
-          transition={{ duration: 0.28, ease: "easeOut" }}
+          initial={{
+            opacity: 0,
+            y: 18,
+            filter: "blur(6px)",
+          }}
+          animate={{
+            opacity: 1,
+            y: 0,
+            filter: "blur(0px)",
+          }}
+          exit={{
+            opacity: 0,
+            y: -12,
+            filter: "blur(4px)",
+          }}
+          transition={{
+            duration: 0.28,
+            ease: "easeOut",
+          }}
       >
         {children}
       </motion.div>
   );
 }
 
-function Hero({ eyebrow, title, subtitle }) {
+function Hero({
+                eyebrow,
+                title,
+                subtitle,
+              }) {
   return (
       <div className="hero">
         <div>
@@ -712,6 +1104,7 @@ function Hero({ eyebrow, title, subtitle }) {
             <Sparkles size={16} />
             {eyebrow}
           </div>
+
           <h1>{title}</h1>
           <p>{subtitle}</p>
         </div>
@@ -719,21 +1112,39 @@ function Hero({ eyebrow, title, subtitle }) {
   );
 }
 
-function StatCard({ icon: Icon, label, value, accent }) {
+function StatCard({
+                    icon: Icon,
+                    label,
+                    value,
+                    accent,
+                  }) {
   return (
-      <motion.div className={`stat-card ${accent}`} whileHover={{ y: -6 }}>
+      <motion.div
+          className={`stat-card ${accent}`}
+          whileHover={{ y: -6 }}
+      >
         <div className="stat-icon">
           <Icon size={24} />
         </div>
+
         <span>{label}</span>
         <strong>{value}</strong>
       </motion.div>
   );
 }
 
-function ActionCard({ icon: Icon, title, description, onClick }) {
+function ActionCard({
+                      icon: Icon,
+                      title,
+                      description,
+                      onClick,
+                    }) {
   return (
-      <motion.button className="action-card" whileHover={{ y: -4 }} onClick={onClick}>
+      <motion.button
+          className="action-card"
+          whileHover={{ y: -4 }}
+          onClick={onClick}
+      >
         <Icon size={24} />
         <strong>{title}</strong>
         <span>{description}</span>
@@ -741,16 +1152,14 @@ function ActionCard({ icon: Icon, title, description, onClick }) {
   );
 }
 
-function Badge({ value }) {
-  const normalized = String(value || "").toLowerCase();
-  return <span className={`badge ${normalized}`}>{value}</span>;
-}
-
 function SkeletonGrid() {
   return (
       <div className="stats-grid">
         {[1, 2, 3, 4, 5].map((item) => (
-            <div className="skeleton-card" key={item} />
+            <div
+                className="skeleton-card"
+                key={item}
+            />
         ))}
       </div>
   );
