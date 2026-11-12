@@ -28,7 +28,7 @@ jobs:
       - name: Run security and integration tests
         working-directory: backend
         run: |
-          bash ./mvnw --batch-mode "-Dtest=SecurityAuthorizationTests,ReservationAuthorizationTests,ReservationValidationTests,ApiExceptionHandlerTests,PostgreSqlIntegrationTests" test
+          bash ./mvnw --batch-mode "-Dtest=SecurityAuthorizationTests,ReservationAuthorizationTests,ReservationValidationTests,ApiExceptionHandlerTests,PostgreSqlIntegrationTests,DemoViewerAuthorizationTests,BackendApplicationTests" test
 
       - name: Build Spring Boot application
         working-directory: backend
